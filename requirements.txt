@@ -1,0 +1,7 @@
+Pillow
+numpy
+PySide6
+# --- AI engine: bundled into the Windows exe at build time ---
+# (install manually only for running from source)
+# pip install torch diffusers transformers accelerate safetensors huggingface_hub
+# Windows AMD/Intel GPU: pip install torch-directml

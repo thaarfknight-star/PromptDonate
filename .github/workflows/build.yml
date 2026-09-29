@@ -1,0 +1,56 @@
+name: Build PromptDonate EXE
+
+on:
+  push:
+    branches: [ "main" ]
+  workflow_dispatch:
+
+concurrency:
+  group: promptdonate-build-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: windows-latest
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: "3.11"
+        cache: 'pip'
+        cache-dependency-path: requirements.txt
+
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+        # Full on-device AI stack (CPU torch wheel is fine for the build;
+        # torch-directml drives AMD/Intel GPUs at runtime on Windows)
+        pip install torch diffusers transformers accelerate safetensors huggingface_hub torch-directml
+        python -m pip install pyinstaller
+
+    - name: Build with PyInstaller
+      shell: pwsh
+      run: |
+        $ErrorActionPreference = "Stop"
+        if (-not (Test-Path "fonts/BNazanin.ttf")) {
+          throw "fonts/BNazanin.ttf missing; cannot bundle Persian font."
+        }
+        python -m PyInstaller build.spec
+        if ($LASTEXITCODE -ne 0) { throw "PyInstaller failed with exit code $LASTEXITCODE" }
+        if (-not (Test-Path "dist/PromptDonate/PromptDonate.exe")) {
+          throw "dist/PromptDonate/PromptDonate.exe not found after build."
+        }
+        $files = (Get-ChildItem -Path "dist/PromptDonate" -Recurse -File | Measure-Object).Count
+        Write-Host "Build OK: PromptDonate.exe + $files files in bundle."
+
+    - name: Upload Windows build
+      uses: actions/upload-artifact@v4
+      with:
+        name: PromptDonate_Windows
+        path: dist/PromptDonate/**
+        if-no-files-found: error
